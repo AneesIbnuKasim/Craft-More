@@ -1,0 +1,31 @@
+{
+  "name": "craft-more",
+  "private": true,
+  "version": "0.1.0",
+  "description": "Backend for the Craft and Shop Store Discount Management System",
+  "type": "module",
+  "scripts": {
+    "dev": "node --watch server/src/server.js",
+    "start": "node server/src/server.js",
+    "init-owner": "node server/scripts/init-owner.js",
+    "test": "node --test",
+    "test:watch": "node --test --watch"
+  },
+  "engines": {
+    "node": ">=20"
+  },
+  "dependencies": {
+    "bcryptjs": "^3.0.2",
+    "connect-mongo": "^5.1.0",
+    "cors": "^2.8.5",
+    "dotenv": "^16.4.7",
+    "express": "^5.1.0",
+    "express-rate-limit": "^7.5.0",
+    "helmet": "^8.1.0",
+    "mongoose": "^8.19.2"
+  },
+  "devDependencies": {
+    "mongodb-memory-server": "^10.2.3",
+    "supertest": "^7.1.1"
+  }
+}
