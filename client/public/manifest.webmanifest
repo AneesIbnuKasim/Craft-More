@@ -1,0 +1,10 @@
+{
+  "name": "Craft More Store Desk",
+  "short_name": "Craft More",
+  "description": "Secure store customer, discount, and billing management.",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#f6f7f3",
+  "theme_color": "#173b38",
+  "icons": [{ "src": "/icons/icon.svg", "sizes": "any", "type": "image/svg+xml", "purpose": "any maskable" }]
+}

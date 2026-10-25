@@ -6,7 +6,8 @@ import { createCustomer, getCustomer, getPurchaseHistory, searchCustomers } from
 export const customerRouter = Router();
 
 customerRouter.post('/', asyncHandler(async (req, res) => {
-  const customer = await createCustomer(req.body ?? {});
+  const body = req.body && typeof req.body === 'object' ? req.body : {};
+  const customer = await createCustomer(body);
   return res.status(201).json({ customer: await getCustomer(customer._id, env.storeTimezone) });
 }));
 

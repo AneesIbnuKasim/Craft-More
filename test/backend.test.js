@@ -153,3 +153,44 @@ test('correction recalculates the bill using the bill date eligibility and recor
   assert.equal(corrected.body.bill.audits.length, 1);
   assert.equal(corrected.body.bill.audits[0].actionType, 'correction');
 });
+
+test('dashboard and report endpoints return database-derived results', async () => {
+  const csrf = (await agent.get('/api/auth/csrf')).body.csrfToken;
+  const customer = await agent.post('/api/customers').set('X-CSRF-Token', csrf).send({ name: 'Report Customer', mobileNumber: '9876543216' });
+  const bill = await agent.post('/api/bills').set('X-CSRF-Token', csrf).set('Idempotency-Key', 'report-bill-key').send({ customerId: customer.body.customer.id, billDate: '2026-10-13T10:00:00+05:30', eligibleProductAmount: 200000, excludedProductAmount: 50000 });
+  assert.equal(bill.status, 201);
+  const dashboard = await agent.get('/api/dashboard/summary');
+  assert.equal(dashboard.status, 200);
+  assert.equal(dashboard.body.currentMonth.validBills, 1);
+  const sales = await agent.get('/api/reports/monthly-sales?period=2026-10');
+  assert.equal(sales.status, 200);
+  assert.equal(sales.body.grossSales, 250000);
+  const customers = await agent.get('/api/reports/customers?period=2026-10');
+  assert.equal(customers.status, 200);
+  assert.equal(customers.body.items.length, 1);
+  const discounts = await agent.get('/api/reports/discounts?period=2026-10');
+  assert.equal(discounts.status, 200);
+  assert.equal(discounts.body.bills.length, 1);
+});
+
+test('two authenticated devices share data and concurrent idempotent bills stay consistent', async () => {
+  const deviceA = request.agent(app);
+  const deviceB = request.agent(app);
+  await Promise.all([
+    deviceA.post('/api/auth/login').send({ email: 'owner@example.com', password: 'correct-horse-battery-staple' }),
+    deviceB.post('/api/auth/login').send({ email: 'owner@example.com', password: 'correct-horse-battery-staple' })
+  ]);
+  const [csrfA, csrfB] = await Promise.all([deviceA.get('/api/auth/csrf'), deviceB.get('/api/auth/csrf')]);
+  const created = await deviceA.post('/api/customers').set('X-CSRF-Token', csrfA.body.csrfToken).send({ name: 'Shared Device Customer', mobileNumber: '9876543217' });
+  assert.equal(created.status, 201);
+  const visibleOnDeviceB = await deviceB.get('/api/customers/search?q=9876543217');
+  assert.equal(visibleOnDeviceB.status, 200);
+  assert.equal(visibleOnDeviceB.body.total, 1);
+  const billBody = { customerId: created.body.customer.id, eligibleProductAmount: 150000, excludedProductAmount: 25000 };
+  const responses = await Promise.all([
+    deviceA.post('/api/bills').set('X-CSRF-Token', csrfA.body.csrfToken).set('Idempotency-Key', 'concurrent-device-bill').send(billBody),
+    deviceB.post('/api/bills').set('X-CSRF-Token', csrfB.body.csrfToken).set('Idempotency-Key', 'concurrent-device-bill').send(billBody)
+  ]);
+  assert.deepEqual(responses.map((response) => response.status).sort(), [200, 201]);
+  assert.equal(await Bill.countDocuments({ idempotencyKey: 'concurrent-device-bill' }), 1);
+});

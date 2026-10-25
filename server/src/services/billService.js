@@ -30,7 +30,7 @@ const validateIdempotencyKey = (value) => {
   return value;
 };
 
-const requestHash = ({ customerId, billDate: date, eligibleProductAmount, excludedProductAmount }) => crypto.createHash('sha256').update(JSON.stringify({ customerId: String(customerId), billDate: date.toISOString(), eligibleProductAmount, excludedProductAmount })).digest('hex');
+const requestHash = ({ customerId, billDate: date, eligibleProductAmount, excludedProductAmount }) => crypto.createHash('sha256').update(JSON.stringify({ customerId: String(customerId), billDate: date ? date.toISOString() : null, eligibleProductAmount, excludedProductAmount })).digest('hex');
 
 const eligibilityFor = async (customerId, date, timeZone, excludeBillId) => {
   const previousMonth = previousMonthKey(date, timeZone);
@@ -57,7 +57,7 @@ export const createBill = async ({ customerId, billDate: rawDate, eligibleProduc
   const date = billDate(rawDate);
   const eligibleProductAmount = amount(rawEligible, 'eligibleProductAmount');
   const excludedProductAmount = amount(rawExcluded, 'excludedProductAmount');
-  const hash = requestHash({ customerId: customerObjectId, billDate: date, eligibleProductAmount, excludedProductAmount });
+  const hash = requestHash({ customerId: customerObjectId, billDate: rawDate === undefined ? null : date, eligibleProductAmount, excludedProductAmount });
   const existing = await Bill.findOne({ idempotencyKey: key });
   if (existing) {
     if (existing.requestHash !== hash) throw new AppError(409, 'Idempotency-Key was already used for a different bill', 'IDEMPOTENCY_KEY_REUSED');

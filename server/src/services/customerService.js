@@ -10,7 +10,7 @@ import { customerTotals } from './billService.js';
 const pageSize = (value) => Math.min(Math.max(Number.parseInt(value ?? '20', 10) || 20, 1), 100);
 
 export const createCustomer = async ({ name, mobileNumber }) => {
-  if (typeof name !== 'string' || name.trim().length < 2 || name.trim().length > 120) throw new AppError(400, 'Name must be between 2 and 120 characters', 'INVALID_NAME');
+  if (typeof name !== 'string' || name.trim().length < 2 || name.trim().length > 120) throw new AppError(400, 'Customer name must be between 2 and 120 characters', 'INVALID_NAME');
   let normalized;
   try { normalized = normalizeMobileNumber(mobileNumber); } catch (error) { throw new AppError(400, error.message, 'INVALID_MOBILE_NUMBER'); }
   const customer = await Customer.create({
