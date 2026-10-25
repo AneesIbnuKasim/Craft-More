@@ -80,6 +80,8 @@ The Vite client reads `VITE_API_BASE_URL` at build time. Copy `client/.env.examp
 
 Use a Node-compatible API host and a static frontend host. The exact provider is intentionally not hardcoded.
 
+This repository includes `render.yaml` for Render Blueprints. In Render, choose **New → Blueprint**, connect the GitHub repository, and select the `main` branch. Render will prompt for the `sync: false` values. Create the API first if you prefer to know its URL before entering `VITE_API_BASE_URL`; otherwise update the frontend variable after the Blueprint creates both services. Render Blueprints use `healthCheckPath: /api/health` for the API and publish the Vite `client/dist` directory for the frontend.
+
 ### API host
 
 Set these production variables in the provider’s secret/environment configuration:
