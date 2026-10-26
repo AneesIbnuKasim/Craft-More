@@ -82,6 +82,8 @@ Use a Node-compatible API host and a static frontend host. The exact provider is
 
 This repository includes `render.yaml` for Render Blueprints. In Render, choose **New → Blueprint**, connect the GitHub repository, and select the `main` branch. Render will prompt for the `sync: false` values. Create the API first if you prefer to know its URL before entering `VITE_API_BASE_URL`; otherwise update the frontend variable after the Blueprint creates both services. Render Blueprints use `healthCheckPath: /api/health` for the API and publish the Vite `client/dist` directory for the frontend.
 
+If mobile browsers block cross-origin session cookies, use the included `render.same-origin.yaml` as a single Render web service configuration. It builds the client, serves it from Express, and exposes both the UI and API under one HTTPS origin. Set `CLIENT_ORIGIN` and `CORS_ORIGINS` to that service’s actual URL, set `SERVE_CLIENT=true`, and use `VITE_API_BASE_URL=/api`. This same-origin option uses `COOKIE_SAME_SITE=lax` and avoids third-party-cookie restrictions.
+
 ### API host
 
 Set these production variables in the provider’s secret/environment configuration:

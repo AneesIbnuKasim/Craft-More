@@ -19,6 +19,7 @@ export const env = {
   cookieSecure: process.env.COOKIE_SECURE === undefined ? process.env.NODE_ENV === 'production' : process.env.COOKIE_SECURE === 'true',
   cookieSameSite: process.env.COOKIE_SAME_SITE ?? (process.env.NODE_ENV === 'production' ? 'none' : 'lax'),
   cookieDomain: process.env.COOKIE_DOMAIN || undefined,
+  serveClient: process.env.SERVE_CLIENT === 'true',
   ownerEmail: process.env.OWNER_EMAIL,
   ownerPassword: process.env.OWNER_PASSWORD
 };

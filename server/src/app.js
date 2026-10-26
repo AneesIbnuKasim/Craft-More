@@ -4,6 +4,8 @@ import MongoStore from 'connect-mongo';
 import helmet from 'helmet';
 import cors from 'cors';
 import rateLimit from 'express-rate-limit';
+import path from 'node:path';
+import { fileURLToPath } from 'node:url';
 import { env } from './config/env.js';
 import { authRouter } from './routes/auth.js';
 import { customerRouter } from './routes/customers.js';
@@ -39,6 +41,11 @@ export const createApp = ({ mongoUri = env.mongoUri, sessionStore, clientOrigin 
   app.use('/api/bills', billRouter);
   app.use('/api/dashboard', dashboardRouter);
   app.use('/api/reports', reportRouter);
+  if (env.serveClient) {
+    const clientDist = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../../client/dist');
+    app.use(express.static(clientDist));
+    app.get(/^(?!\/api(?:\/|$)).*/, (req, res) => res.sendFile(path.join(clientDist, 'index.html')));
+  }
   app.use((req, res, next) => next(new AppError(404, 'Route not found', 'NOT_FOUND')));
   app.use(errorHandler);
   return app;
