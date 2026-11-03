@@ -22,6 +22,16 @@ export const createCustomer = async ({ name, mobileNumber }) => {
   return customer;
 };
 
+export const updateCustomer = async (id, { name, mobileNumber }, timeZone) => {
+  if (!/^[a-f\d]{24}$/i.test(String(id))) throw new AppError(400, 'Invalid customer ID', 'INVALID_CUSTOMER_ID');
+  if (typeof name !== 'string' || name.trim().length < 2 || name.trim().length > 120) throw new AppError(400, 'Customer name must be between 2 and 120 characters', 'INVALID_NAME');
+  let normalized;
+  try { normalized = normalizeMobileNumber(mobileNumber); } catch (error) { throw new AppError(400, error.message, 'INVALID_MOBILE_NUMBER'); }
+  const customer = await Customer.findByIdAndUpdate(id, { $set: { name: name.trim(), mobileNumber: normalized, normalizedMobileNumber: normalized, updatedAt: new Date() } }, { new: true, runValidators: true });
+  if (!customer) throw new AppError(404, 'Customer not found', 'CUSTOMER_NOT_FOUND');
+  return serializeCustomer(customer, timeZone);
+};
+
 const totalsFor = async (customerId, timeZone, now = new Date()) => {
   return customerTotals(customerId, timeZone, now);
 };
@@ -37,7 +47,10 @@ export const searchCustomers = async ({ query, page, timeZone }) => {
   const filter = {};
   if (query?.trim()) {
     const escaped = query.trim().replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-    filter.$or = [{ name: { $regex: escaped, $options: 'i' } }, { normalizedMobileNumber: { $regex: escaped.replace(/\D/g, ''), $options: 'i' } }];
+    const conditions = [{ name: { $regex: escaped, $options: 'i' } }];
+    const digits = query.trim().replace(/\D/g, '');
+    if (digits) conditions.push({ normalizedMobileNumber: { $regex: digits } });
+    filter.$or = conditions;
   }
   const limit = pageSize(page?.limit);
   const currentPage = Math.max(Number.parseInt(page?.page ?? '1', 10) || 1, 1);

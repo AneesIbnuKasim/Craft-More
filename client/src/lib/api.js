@@ -30,6 +30,7 @@ export const api = {
   customer: (id) => request(`/customers/${id}`),
   customerPurchases: (id, query = '') => request(`/customers/${id}/purchases${query}`),
   createCustomer: async (body) => request('/customers', { method: 'POST', headers: { 'X-CSRF-Token': await withCsrf() }, body: JSON.stringify(body) }),
+  updateCustomer: async (id, body) => request(`/customers/${id}`, { method: 'PUT', headers: { 'X-CSRF-Token': await withCsrf() }, body: JSON.stringify(body) }),
   bills: (query = '') => request(`/bills${query}`),
   bill: (id) => request(`/bills/${id}`),
   createBill: async (body, idempotencyKey) => request('/bills', { method: 'POST', headers: { 'X-CSRF-Token': await withCsrf(), 'Idempotency-Key': idempotencyKey }, body: JSON.stringify(body) }),

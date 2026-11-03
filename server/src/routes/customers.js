@@ -1,7 +1,7 @@
 import { Router } from 'express';
 import { asyncHandler } from '../utils/http.js';
 import { env } from '../config/env.js';
-import { createCustomer, getCustomer, getPurchaseHistory, searchCustomers } from '../services/customerService.js';
+import { createCustomer, getCustomer, getPurchaseHistory, searchCustomers, updateCustomer } from '../services/customerService.js';
 
 export const customerRouter = Router();
 
@@ -18,4 +18,5 @@ customerRouter.get('/:id/discount-eligibility', asyncHandler(async (req, res) =>
   const customer = await getCustomer(req.params.id, env.storeTimezone);
   return res.json({ previousMonth: customer.previousMonth, previousMonthEligiblePurchases: customer.previousMonthEligiblePurchases, discountPercentage: customer.discountPercentage });
 }));
+customerRouter.put('/:id', asyncHandler(async (req, res) => res.json({ customer: await updateCustomer(req.params.id, req.body ?? {}, env.storeTimezone) })));
 customerRouter.get('/:id', asyncHandler(async (req, res) => res.json({ customer: await getCustomer(req.params.id, env.storeTimezone) })));

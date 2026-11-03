@@ -17,8 +17,9 @@ const { Customer } = await import('../server/src/models/Customer.js');
 const { Bill } = await import('../server/src/models/Bill.js');
 const { AuditRecord } = await import('../server/src/models/AuditRecord.js');
 const { discountPercentageForEligiblePaise, calculateBillAmounts } = await import('../server/src/services/discountService.js');
-const { previousMonthKey } = await import('../server/src/utils/dates.js');
+const { monthKey, previousMonthKey } = await import('../server/src/utils/dates.js');
 const bcrypt = await import('bcryptjs');
+const currentTestPeriod = monthKey(new Date(), 'Asia/Kolkata');
 
 let mongo;
 let app;
@@ -99,6 +100,18 @@ test('customer profile and purchase history return calculated totals', async () 
   assert.equal(history.body.total, 1);
 });
 
+test('owner can edit a customer profile and mobile numbers remain unique', async () => {
+  const csrf = (await agent.get('/api/auth/csrf')).body.csrfToken;
+  const first = await agent.post('/api/customers').set('X-CSRF-Token', csrf).send({ name: 'Editable Customer', mobileNumber: '9876543220' });
+  const second = await agent.post('/api/customers').set('X-CSRF-Token', csrf).send({ name: 'Another Customer', mobileNumber: '9876543221' });
+  const updated = await agent.put(`/api/customers/${first.body.customer.id}`).set('X-CSRF-Token', csrf).send({ name: 'Updated Customer', mobileNumber: '+91 98765 43300' });
+  assert.equal(updated.status, 200);
+  assert.equal(updated.body.customer.name, 'Updated Customer');
+  assert.equal(updated.body.customer.mobileNumber, '9876543300');
+  const duplicate = await agent.put(`/api/customers/${first.body.customer.id}`).set('X-CSRF-Token', csrf).send({ name: 'Updated Customer', mobileNumber: second.body.customer.mobileNumber });
+  assert.equal(duplicate.status, 409);
+});
+
 test('bill creation uses the previous calendar month and preserves calculations', async () => {
   const csrf = (await agent.get('/api/auth/csrf')).body.csrfToken;
   const customer = await agent.post('/api/customers').set('X-CSRF-Token', csrf).send({ name: 'Bill Customer', mobileNumber: '9876543212' });
@@ -116,7 +129,7 @@ test('bill creation uses the previous calendar month and preserves calculations'
 test('duplicate bill submissions are idempotent and current purchases do not change eligibility', async () => {
   const csrf = (await agent.get('/api/auth/csrf')).body.csrfToken;
   const customer = await agent.post('/api/customers').set('X-CSRF-Token', csrf).send({ name: 'Idempotent Customer', mobileNumber: '9876543213' });
-  const body = { customerId: customer.body.customer.id, billDate: '2026-10-11T10:00:00+05:30', eligibleProductAmount: 450000, excludedProductAmount: 0 };
+  const body = { customerId: customer.body.customer.id, billDate: `${currentTestPeriod}-11T10:00:00+05:30`, eligibleProductAmount: 450000, excludedProductAmount: 0 };
   const first = await agent.post('/api/bills').set('X-CSRF-Token', csrf).set('Idempotency-Key', 'same-bill-key').send(body);
   const retry = await agent.post('/api/bills').set('X-CSRF-Token', csrf).set('Idempotency-Key', 'same-bill-key').send(body);
   assert.equal(first.status, 201);
@@ -157,18 +170,18 @@ test('correction recalculates the bill using the bill date eligibility and recor
 test('dashboard and report endpoints return database-derived results', async () => {
   const csrf = (await agent.get('/api/auth/csrf')).body.csrfToken;
   const customer = await agent.post('/api/customers').set('X-CSRF-Token', csrf).send({ name: 'Report Customer', mobileNumber: '9876543216' });
-  const bill = await agent.post('/api/bills').set('X-CSRF-Token', csrf).set('Idempotency-Key', 'report-bill-key').send({ customerId: customer.body.customer.id, billDate: '2026-10-13T10:00:00+05:30', eligibleProductAmount: 200000, excludedProductAmount: 50000 });
+  const bill = await agent.post('/api/bills').set('X-CSRF-Token', csrf).set('Idempotency-Key', 'report-bill-key').send({ customerId: customer.body.customer.id, billDate: `${currentTestPeriod}-13T10:00:00+05:30`, eligibleProductAmount: 200000, excludedProductAmount: 50000 });
   assert.equal(bill.status, 201);
   const dashboard = await agent.get('/api/dashboard/summary');
   assert.equal(dashboard.status, 200);
   assert.equal(dashboard.body.currentMonth.validBills, 1);
-  const sales = await agent.get('/api/reports/monthly-sales?period=2026-10');
+  const sales = await agent.get(`/api/reports/monthly-sales?period=${currentTestPeriod}`);
   assert.equal(sales.status, 200);
   assert.equal(sales.body.grossSales, 250000);
-  const customers = await agent.get('/api/reports/customers?period=2026-10');
+  const customers = await agent.get(`/api/reports/customers?period=${currentTestPeriod}`);
   assert.equal(customers.status, 200);
   assert.equal(customers.body.items.length, 1);
-  const discounts = await agent.get('/api/reports/discounts?period=2026-10');
+  const discounts = await agent.get(`/api/reports/discounts?period=${currentTestPeriod}`);
   assert.equal(discounts.status, 200);
   assert.equal(discounts.body.bills.length, 1);
 });
