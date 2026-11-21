@@ -41,3 +41,10 @@ export const api = {
   customerReport: (period) => request(`/reports/customers?period=${encodeURIComponent(period)}`),
   discountReport: (period) => request(`/reports/discounts?period=${encodeURIComponent(period)}`)
 };
+
+// product labels
+const _orig = api;
+api.products = (query = '') => request(`/products${query}`);
+api.product = (id) => request(`/products/${id}`);
+api.productLabel = (id) => request(`/products/${id}/label`);
+api.productLabels = async (items) => request('/products/labels', { method: 'POST', headers: { 'X-CSRF-Token': await withCsrf() }, body: JSON.stringify({ items }) });

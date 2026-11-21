@@ -19,7 +19,7 @@ function Login({ onLogin }) {
 
 function Shell({ onLogout, children }) {
   const [open, setOpen] = useState(false); const path = window.location.pathname;
-  const links = [['/', 'Overview', '⌂'], ['/customers', 'Customers', '♧'], ['/bills/new', 'New bill', '+'], ['/bills', 'Bill history', '▤'], ['/reports', 'Reports', '◫']];
+  const links = [['/', 'Overview', '⌂'], ['/customers', 'Customers', '♧'], ['/bills/new', 'New bill', '+'], ['/bills', 'Bill history', '▤'], ['/labels', 'Labels', '🏷'], ['/reports', 'Reports', '◫']];
   const go = (href) => { navigate(href); setOpen(false); };
   return <div className="app-shell"><aside className={open ? 'sidebar open' : 'sidebar'}><div className="sidebar-brand"><div className="brand-mark small">CM</div><div><strong>Craft More</strong><small>Store desk</small></div></div><nav>{links.map(([href, label, icon]) => <button key={href} className={path === href || (href !== '/' && path.startsWith(href)) ? 'active' : ''} onClick={() => go(href)}><span>{icon}</span>{label}</button>)}</nav><div className="sidebar-footer"><span className="status-dot" /> Connected to cloud</div></aside><div className="main-area"><header className="topbar"><button className="menu-toggle" onClick={() => setOpen(!open)}>☰</button><div className="topbar-title">{links.find(([href]) => path === href || (href !== '/' && path.startsWith(href)))?.[1] ?? 'Overview'}</div><button className="logout" onClick={onLogout}>Log out</button></header><main className="content">{children}</main></div></div>;
 }
@@ -74,11 +74,28 @@ const SalesReport = ({ data }) => <div className="report-grid">{[['Valid bills',
 const CustomerReport = ({ data }) => { const items = Array.isArray(data?.items) ? data.items : []; return items.length ? <div className="table-wrap"><table><thead><tr><th>Customer</th><th>Mobile</th><th>Lifetime purchases</th><th>Lifetime discounts</th><th>Tier</th><th>Current eligible</th></tr></thead><tbody>{items.map((row) => <tr key={row.customerId}><td><strong>{row.name}</strong><small>{row.customerId}</small></td><td>{row.mobileNumber}</td><td><Money value={row.lifetimePurchases} /></td><td><Money value={row.lifetimeDiscounts} /></td><td>{row.currentDiscountPercentage}%</td><td><Money value={row.currentMonthEligiblePurchases} /></td></tr>)}</tbody></table></div> : <Empty>No customer report records for this period.</Empty>; };
 const DiscountReport = ({ data }) => { const byTier = Array.isArray(data?.byTier) ? data.byTier : []; const bills = Array.isArray(data?.bills) ? data.bills : []; return <><div className="report-grid">{byTier.map((row) => <Metric key={row._id} label={`${row._id}% discount`} value={row.billCount} number />)}<Metric label="Total discount amount" value={byTier.reduce((sum, row) => sum + (row.totalDiscountAmount ?? 0), 0)} /></div><h2 className="subheading">Bill-level discounts</h2>{bills.length ? <div className="table-wrap"><table><thead><tr><th>Bill</th><th>Date</th><th>Customer</th><th>Tier</th><th>Discount</th></tr></thead><tbody>{bills.map((bill) => <tr key={bill._id}><td>{bill.billNumber}</td><td>{formatDate(bill.billDate)}</td><td>{bill.customerId?.name}</td><td>{bill.discountPercentage}%</td><td><Money value={bill.discountAmount} /></td></tr>)}</tbody></table></div> : <Empty>No discounts recorded for this period.</Empty>}</>; };
 
+
+function Labels() {
+  const [query, setQuery] = useState(''); const [results, setResults] = useState([]); const [queue, setQueue] = useState([]); const [qty, setQty] = useState(1);
+  const search = async () => { if (!query.trim()) return setResults([]); try { setResults((await api.products('?q=' + encodeURIComponent(query))).items); } catch (e) {} };
+  const add = (p) => { if (queue.find(q=>q.id===p._id)) return; setQueue([...queue, { id: p._id, name: p.name, sku: p.sku, barcode: p.barcode, special: p.specialPricePaise, regular: p.regularPricePaise, qty: 1 }]); };
+  const remove = (id) => setQueue(queue.filter(q=>q.id!==id));
+  const updateQty = (id, v) => setQueue(queue.map(q=>q.id===id?{...q,qty:Number(v)||1}:q));
+  const print = () => window.print();
+  return <><div className="page-heading"><h1>Label printing</h1></div>
+  <div className="two-column">
+  <section className="panel"><div className="search-row"><input placeholder="Search products" value={query} onChange={e=>setQuery(e.target.value)} /><Button onClick={search}>Find</Button></div>
+  {results.map(p=><div key={p._id} className="suggestion-row"><span>{p.name} ({p.sku})</span><Button variant="secondary" onClick={()=>add(p)}>Add</Button></div>)}</section>
+  <section className="panel"><h2>Queue</h2>{queue.map(q=><div key={q.id} className="queue-row"><span>{q.name}</span><input type="number" min="1" value={q.qty} onChange={e=>updateQty(q.id,e.target.value)} style={{width:60}} /><Button variant="danger" onClick={()=>remove(q.id)}>Remove</Button></div>)}
+  <div className="button-row"><Button onClick={print}>Print labels</Button><Button variant="secondary" onClick={()=>setQueue([])}>Clear</Button></div></section></div>
+  <section className="panel label-preview"><h2>Preview</h2><div className="labels-grid">{queue.flatMap(q=>Array.from({length:q.qty}).map((_,i)=><div key={q.id+'-'+i} className="label-card"><strong>CRAFT & MORE</strong><div>{q.name}</div><div>{q.barcode}</div><div>SKU: {q.sku}</div><div>Selling Price: ₹{(q.special/100).toFixed(2)}</div></div>))}</div></section></>;
+}
+
 export function App() {
   const path = useRoute(); const [authenticated, setAuthenticated] = useState(null);
   useEffect(() => { api.me().then(() => setAuthenticated(true)).catch(() => setAuthenticated(false)); }, []);
   if (authenticated === null) return <Loading />;
   if (!authenticated) return <Login onLogin={() => setAuthenticated(true)} />;
-  const content = path === '/' ? <Dashboard /> : path === '/customers' ? <Customers /> : path.startsWith('/customers/') ? <CustomerProfile id={path.split('/')[2]} /> : path === '/bills/new' ? <BillEntry /> : path === '/bills' ? <Bills /> : path.startsWith('/bills/') ? <BillDetail id={path.split('/')[2]} /> : path === '/reports' ? <Reports /> : <Dashboard />;
+  const content = path === '/' ? <Dashboard /> : path === '/customers' ? <Customers /> : path.startsWith('/customers/') ? <CustomerProfile id={path.split('/')[2]} /> : path === '/bills/new' ? <BillEntry /> : path === '/bills' ? <Bills /> : path.startsWith('/bills/') ? <BillDetail id={path.split('/')[2]} /> : path === '/labels' ? <Labels /> : path === '/reports' ? <Reports /> : <Dashboard />;
   return <Shell onLogout={async () => { await api.logout(); setAuthenticated(false); navigate('/'); }}>{content}</Shell>;
 }
