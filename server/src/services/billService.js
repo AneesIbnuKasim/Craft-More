@@ -192,3 +192,30 @@ export const customerTotals = async (customerId, timeZone, now = new Date()) => 
   const [result] = await Bill.aggregate([{ $match: { customerId, status: 'valid' } }, { $group: { _id: null, lifetimePurchases: { $sum: '$grossTotal' }, lifetimeDiscounts: { $sum: '$discountAmount' }, validBills: { $sum: 1 }, currentEligible: { $sum: { $cond: [{ $eq: ['$reportingMonth', currentMonth] }, '$eligibleProductAmount', 0] } }, previousEligible: { $sum: { $cond: [{ $eq: ['$reportingMonth', previousMonth] }, '$eligibleProductAmount', 0] } }, currentGross: { $sum: { $cond: [{ $eq: ['$reportingMonth', currentMonth] }, '$grossTotal', 0] } } } }]);
   return { currentMonth, previousMonth, previousMonthEligiblePurchases: result?.previousEligible ?? 0, currentMonthEligiblePurchases: result?.currentEligible ?? 0, currentMonthGrossPurchases: result?.currentGross ?? 0, lifetimePurchases: result?.lifetimePurchases ?? 0, lifetimeDiscounts: result?.lifetimeDiscounts ?? 0, validBills: result?.validBills ?? 0 };
 };
+
+export const getReceipt = async (id) => {
+  const bill = await getBill(id);
+  return {
+    store: { name: 'CRAFT & MORE' },
+    invoiceNumber: bill.billNumber,
+    date: bill.billDate,
+    customer: bill.customerId ? { name: bill.customerId.name, mobile: bill.customerId.mobileNumber, customerId: bill.customerId.customerId } : null,
+    discountPercentage: bill.discountPercentage,
+    eligibleAmount: bill.eligibleProductAmount,
+    excludedAmount: bill.excludedProductAmount,
+    grossTotal: bill.grossTotal,
+    discountAmount: bill.discountAmount,
+    finalPayableAmount: bill.finalPayableAmount,
+    status: bill.status,
+    items: (bill.products ?? []).map((p) => ({
+      name: p.name,
+      sku: p.sku,
+      barcode: p.barcode,
+      quantity: p.quantity,
+      regularPrice: p.regularPricePaise,
+      specialPrice: p.specialPricePaise ?? p.pricePaise,
+      amount: (p.specialPricePaise ?? p.pricePaise) * p.quantity,
+      discountEligible: p.discountEligible
+    }))
+  };
+};
