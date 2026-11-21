@@ -12,6 +12,7 @@ import { customerRouter } from './routes/customers.js';
 import { billRouter } from './routes/bills.js';
 import { dashboardRouter } from './routes/dashboard.js';
 import { reportRouter } from './routes/reports.js';
+import { productRouter } from './routes/products.js';
 import { requireAuth, requireCsrf } from './middleware/auth.js';
 import { AppError, errorHandler } from './utils/http.js';
 
@@ -41,6 +42,7 @@ export const createApp = ({ mongoUri = env.mongoUri, sessionStore, clientOrigin 
   app.use('/api/bills', billRouter);
   app.use('/api/dashboard', dashboardRouter);
   app.use('/api/reports', reportRouter);
+app.use('/api/products', productRouter);
   if (env.serveClient) {
     const clientDist = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../../client/dist');
     app.use(express.static(clientDist));
