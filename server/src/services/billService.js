@@ -70,10 +70,11 @@ export const createBill = async ({ customerId, billDate: rawDate, eligibleProduc
       const lineAmount = product.pricePaise * qty;
       if (product.discountEligible) eligibleProductAmount += lineAmount; else excludedProductAmount += lineAmount;
     }
-    // decrement stock
+    // atomic stock decrement
     for (const line of products) {
       const qty = Number(line.quantity ?? 1);
-      await Product.findByIdAndUpdate(line.productId, { $inc: { stock: -qty }, $set: { updatedAt: new Date() } });
+      const updated = await Product.findOneAndUpdate({ _id: line.productId, stock: { $gte: qty } }, { $inc: { stock: -qty }, $set: { updatedAt: new Date() } }, { new: true });
+      if (!updated) throw new AppError(409, 'Insufficient stock', 'INSUFFICIENT_STOCK');
     }
   }
   const hash = requestHash({ customerId: customerObjectId, billDate: rawDate === undefined ? null : date, eligibleProductAmount, excludedProductAmount });
