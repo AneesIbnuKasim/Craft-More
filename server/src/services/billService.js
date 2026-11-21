@@ -4,6 +4,7 @@ import { Bill } from '../models/Bill.js';
 import { AuditRecord } from '../models/AuditRecord.js';
 import { Counter } from '../models/Counter.js';
 import { Customer } from '../models/Customer.js';
+import { Product } from '../models/Product.js';
 import { AppError } from '../utils/http.js';
 import { monthKey, previousMonthKey } from '../utils/dates.js';
 import { calculateBillAmounts, discountPercentageForEligiblePaise } from './discountService.js';
@@ -51,12 +52,29 @@ const getCustomerOrFail = async (id) => {
   return customer;
 };
 
-export const createBill = async ({ customerId, billDate: rawDate, eligibleProductAmount: rawEligible, excludedProductAmount: rawExcluded, idempotencyKey }, timeZone) => {
+export const createBill = async ({ customerId, billDate: rawDate, eligibleProductAmount: rawEligible, excludedProductAmount: rawExcluded, products, idempotencyKey }, timeZone) => {
   const customerObjectId = objectId(customerId, 'customer');
   const key = validateIdempotencyKey(idempotencyKey);
   const date = billDate(rawDate);
-  const eligibleProductAmount = amount(rawEligible, 'eligibleProductAmount');
-  const excludedProductAmount = amount(rawExcluded, 'excludedProductAmount');
+  let eligibleProductAmount = amount(rawEligible, 'eligibleProductAmount');
+  let excludedProductAmount = amount(rawExcluded, 'excludedProductAmount');
+  if (Array.isArray(products) && products.length) {
+    eligibleProductAmount = 0; excludedProductAmount = 0;
+    for (const line of products) {
+      const product = await Product.findById(line.productId);
+      if (!product) throw new AppError(404, 'Product not found', 'PRODUCT_NOT_FOUND');
+      const qty = Number(line.quantity ?? 1);
+      if (!Number.isInteger(qty) || qty < 1) throw new AppError(400, 'quantity must be positive integer', 'INVALID_QUANTITY');
+      if (product.stock < qty) throw new AppError(409, 'Insufficient stock', 'INSUFFICIENT_STOCK');
+      const lineAmount = product.pricePaise * qty;
+      if (product.discountEligible) eligibleProductAmount += lineAmount; else excludedProductAmount += lineAmount;
+    }
+    // decrement stock
+    for (const line of products) {
+      const qty = Number(line.quantity ?? 1);
+      await Product.findByIdAndUpdate(line.productId, { $inc: { stock: -qty }, $set: { updatedAt: new Date() } });
+    }
+  }
   const hash = requestHash({ customerId: customerObjectId, billDate: rawDate === undefined ? null : date, eligibleProductAmount, excludedProductAmount });
   const existing = await Bill.findOne({ idempotencyKey: key });
   if (existing) {
