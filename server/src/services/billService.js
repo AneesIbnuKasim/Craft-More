@@ -5,6 +5,7 @@ import { AuditRecord } from '../models/AuditRecord.js';
 import { Counter } from '../models/Counter.js';
 import { Customer } from '../models/Customer.js';
 import { Product } from '../models/Product.js';
+import { StockMovement } from '../models/StockMovement.js';
 import { AppError } from '../utils/http.js';
 import { monthKey, previousMonthKey } from '../utils/dates.js';
 import { calculateBillAmounts, discountPercentageForEligiblePaise } from './discountService.js';
@@ -84,12 +85,22 @@ export const createBill = async ({ customerId, billDate: rawDate, eligibleProduc
   await getCustomerOrFail(customerObjectId);
   const eligibility = await eligibilityFor(customerObjectId, date, timeZone);
   const calculated = calculateBillAmounts({ eligibleProductAmount, excludedProductAmount, discountPercentage: eligibility.discountPercentage });
+  const productLines = Array.isArray(products) && products.length ? await Promise.all(products.map(async (line) => {
+    const product = await Product.findById(line.productId).lean();
+    const qty = Number(line.quantity ?? 1);
+    return { productId: product._id, quantity: qty, pricePaise: product.pricePaise, discountEligible: product.discountEligible };
+  })) : [];
   const document = {
     billNumber: await nextBillNumber(), customerId: customerObjectId, billDate: date, reportingMonth: monthKey(date, timeZone),
-    eligibleProductAmount, excludedProductAmount, ...calculated, discountPercentage: eligibility.discountPercentage, status: 'valid', idempotencyKey: key, requestHash: hash
+    eligibleProductAmount, excludedProductAmount, ...calculated, discountPercentage: eligibility.discountPercentage, status: 'valid', idempotencyKey: key, requestHash: hash, products: productLines, stockRestored: false
   };
   try {
     const bill = await Bill.create(document);
+    if (productLines.length) {
+      for (const line of productLines) {
+        await StockMovement.create({ productId: line.productId, type: 'sale', quantity: -line.quantity, billId: bill._id });
+      }
+    }
     return { bill, idempotent: false, eligibility };
   } catch (error) {
     if (error?.code === 11000) {
@@ -164,7 +175,13 @@ export const cancelBill = async (id, reason) => {
   const current = await Bill.findById(billId);
   if (!current) throw new AppError(404, 'Bill not found', 'BILL_NOT_FOUND');
   if (current.status === 'cancelled') throw new AppError(409, 'Bill is already cancelled', 'BILL_ALREADY_CANCELLED');
-  const updated = await Bill.findOneAndUpdate({ _id: billId, status: 'valid', updatedAt: current.updatedAt }, { $set: { status: 'cancelled', updatedAt: new Date() } }, { new: true });
+  if (!current.stockRestored && Array.isArray(current.products) && current.products.length) {
+    for (const line of current.products) {
+      await Product.findByIdAndUpdate(line.productId, { $inc: { stock: line.quantity }, $set: { updatedAt: new Date() } });
+      await StockMovement.create({ productId: line.productId, type: 'cancellation', quantity: line.quantity, billId: current._id, reason: reason.trim() });
+    }
+  }
+  const updated = await Bill.findOneAndUpdate({ _id: billId, status: 'valid', updatedAt: current.updatedAt }, { $set: { status: 'cancelled', stockRestored: true, updatedAt: new Date() } }, { new: true });
   if (!updated) throw new AppError(409, 'Bill changed concurrently; reload and try again', 'CONCURRENT_BILL_UPDATE');
   await AuditRecord.create({ billId, actionType: 'cancellation', previousValues: { status: 'valid' }, updatedValues: { status: 'cancelled' }, reason: reason.trim() });
   return getBill(id);
