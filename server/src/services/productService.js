@@ -103,3 +103,29 @@ export const adjustStock = async (id, delta) => {
 export const lowStockProducts = async () => {
   return Product.find({ $expr: { $lte: ['$stock', '$lowStockThreshold'] } }).sort({ stock: 1 }).lean();
 };
+
+export const getLabelData = async (id) => {
+  const p = await getProduct(id);
+  return {
+    productId: p._id,
+    name: p.name,
+    sku: p.sku,
+    barcode: p.barcode ?? null,
+    specialPricePaise: p.specialPricePaise ?? p.pricePaise,
+    regularPricePaise: p.regularPricePaise ?? null,
+    storeName: 'CRAFT & MORE'
+  };
+};
+
+export const batchLabels = async (items) => {
+  if (!Array.isArray(items) || items.length === 0) throw new AppError(400, 'items must be non-empty array', 'INVALID_ITEMS');
+  if (items.length > 100) throw new AppError(400, 'Too many items', 'TOO_MANY_ITEMS');
+  const result = [];
+  for (const item of items) {
+    const qty = Number(item.quantity ?? 1);
+    if (!Number.isInteger(qty) || qty < 1 || qty > 1000) throw new AppError(400, 'quantity must be 1-1000', 'INVALID_QUANTITY');
+    const label = await getLabelData(item.productId);
+    for (let i = 0; i < qty; i++) result.push(label);
+  }
+  return result;
+};
