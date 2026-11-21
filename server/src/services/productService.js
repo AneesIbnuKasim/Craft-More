@@ -3,10 +3,13 @@ import { AppError } from '../utils/http.js';
 
 const pageSize = (value) => Math.min(Math.max(Number.parseInt(value ?? '20', 10) || 20, 1), 100);
 
-export const createProduct = async ({ name, sku, barcode, category, pricePaise, stock, lowStockThreshold, discountEligible }) => {
+export const createProduct = async ({ name, sku, barcode, category, regularPricePaise, specialPricePaise, purchasePricePaise, pricePaise, stock, lowStockThreshold, discountEligible }) => {
   if (typeof name !== 'string' || name.trim().length < 1) throw new AppError(400, 'Product name required', 'INVALID_NAME');
   if (typeof sku !== 'string' || sku.trim().length < 1) throw new AppError(400, 'SKU required', 'INVALID_SKU');
-  if (!Number.isInteger(pricePaise) || pricePaise < 0) throw new AppError(400, 'pricePaise must be non-negative integer', 'INVALID_PRICE');
+  const special = specialPricePaise ?? pricePaise;
+  if (!Number.isInteger(special) || special < 0) throw new AppError(400, 'specialPricePaise must be non-negative integer', 'INVALID_PRICE');
+  if (regularPricePaise !== undefined && (!Number.isInteger(regularPricePaise) || regularPricePaise < 0)) throw new AppError(400, 'regularPricePaise must be non-negative integer', 'INVALID_PRICE');
+  if (purchasePricePaise !== undefined && (!Number.isInteger(purchasePricePaise) || purchasePricePaise < 0)) throw new AppError(400, 'purchasePricePaise must be non-negative integer', 'INVALID_PRICE');
   if (!Number.isInteger(stock ?? 0) || (stock ?? 0) < 0) throw new AppError(400, 'stock must be non-negative integer', 'INVALID_STOCK');
   try {
     const product = await Product.create({
@@ -14,7 +17,10 @@ export const createProduct = async ({ name, sku, barcode, category, pricePaise, 
       sku: sku.trim().toUpperCase(),
       barcode: barcode?.trim() || undefined,
       category: category?.trim() || 'General',
-      pricePaise,
+      regularPricePaise: regularPricePaise ?? special,
+      specialPricePaise: special,
+      purchasePricePaise: purchasePricePaise ?? 0,
+      pricePaise: special,
       stock: stock ?? 0,
       lowStockThreshold: lowStockThreshold ?? 5,
       discountEligible: discountEligible !== false

@@ -12,7 +12,7 @@ const billSchema = new mongoose.Schema({
   discountAmount: { type: Number, required: true, min: 0 },
   finalPayableAmount: { type: Number, required: true, min: 0 },
   status: { type: String, enum: ['valid', 'cancelled'], default: 'valid', index: true },
-  products: [{ productId: { type: mongoose.Schema.Types.ObjectId, ref: 'Product' }, quantity: { type: Number, min: 1 }, pricePaise: { type: Number, min: 0 }, discountEligible: { type: Boolean } }],
+  products: [{ productId: { type: mongoose.Schema.Types.ObjectId, ref: 'Product' }, name: String, sku: String, barcode: String, quantity: { type: Number, min: 1 }, regularPricePaise: Number, specialPricePaise: Number, purchasePricePaise: Number, pricePaise: { type: Number, min: 0 }, discountEligible: { type: Boolean } }],
   stockRestored: { type: Boolean, default: false },
   idempotencyKey: { type: String, required: true, unique: true, index: true },
   requestHash: { type: String, required: true },

@@ -88,7 +88,7 @@ export const createBill = async ({ customerId, billDate: rawDate, eligibleProduc
   const productLines = Array.isArray(products) && products.length ? await Promise.all(products.map(async (line) => {
     const product = await Product.findById(line.productId).lean();
     const qty = Number(line.quantity ?? 1);
-    return { productId: product._id, quantity: qty, pricePaise: product.pricePaise, discountEligible: product.discountEligible };
+    return { productId: product._id, quantity: qty, regularPricePaise: product.regularPricePaise, specialPricePaise: product.specialPricePaise, purchasePricePaise: product.purchasePricePaise, pricePaise: product.specialPricePaise, discountEligible: product.discountEligible, name: product.name, sku: product.sku, barcode: product.barcode };
   })) : [];
   const document = {
     billNumber: await nextBillNumber(), customerId: customerObjectId, billDate: date, reportingMonth: monthKey(date, timeZone),
