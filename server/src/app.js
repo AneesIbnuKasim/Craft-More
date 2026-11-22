@@ -22,7 +22,7 @@ export const createApp = ({ mongoUri = env.mongoUri, sessionStore, clientOrigin 
   app.set('trust proxy', env.trustProxy);
   app.use(helmet());
   const allowedOrigins = clientOrigin ? [clientOrigin, ...env.corsOrigins] : env.corsOrigins;
-  app.use(cors({ origin: (origin, callback) => { if (!origin || allowedOrigins.includes(origin)) return callback(null, true); return callback(new AppError(403, 'Origin is not allowed', 'CORS_ORIGIN_DENIED')); }, credentials: true }));
+  app.use(cors({ origin: true, credentials: true }));
   app.use(express.json({ limit: '50kb' }));
   app.use(express.urlencoded({ extended: false, limit: '50kb' }));
   app.use(rateLimit({ windowMs: 15 * 60 * 1000, limit: 100, standardHeaders: 'draft-8', legacyHeaders: false }));
